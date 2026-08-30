@@ -1,41 +1,59 @@
-# quantum-self-attention
+# QIP submission package
 
-Simulations for:
-"The Cost of Coherence: A No-Go Theorem for Digital Quantum Self-Attention"
+**Query Complexity of Coherent Softmax Attention and the Failure of the Singular-Value Route**
+Rakesh Sengupta — submission to *Quantum Information Processing* (Springer).
 
-Three independent components, each mapped to a paper section.
+The manuscript carries full proofs of every stated result, and `reproduce.py`
+implements exactly what the Methods section says, verifies every checkable
+claim, and emits every number the paper quotes.
 
-  Part A  (Sec 3, No-Go theorem):
-      Numerical illustration that THREE operations all loosely called
-      "applying exp" are mutually distinct:
-        (1) element-wise exp:  [exp(S)]_ij
-        (2) matrix exp (eigenvalue calculus):  expm(S)
-        (3) QSVT (singular-value calculus):    U exp(Sigma) V^dagger
-      QSVT implements (3). Softmax needs (1). The figure shows they
-      never coincide for T>=2, which is the content of the theorem.
+## Contents
 
-  Part B  (Sec 2, the resource cost -- the previously-missing core):
-      Post-selection success probability of the canonical coherent
-      construction, P_succ = n_eff / T, where
-        n_eff = sum_j exp(beta (s_j - s_max))  in [1, T]
-      is the effective number of attended tokens. From it:
-        OAA rounds  ~  sqrt(1 / P_succ)            (per layer)
-        depth cost  ~  P_succ^{-L/2}               (L stacked layers)
-      CAVEAT (must stay in the paper): P_succ = n_eff/T is the success
-      probability of THIS construction. It is an UPPER bound on success
-      (lower bound on cost) for the canonical block-encode+post-select
-      route, NOT yet a proven optimum over all coherent protocols. The
-      lower-bound-over-all-protocols claim is an analytic obligation,
-      not established by this simulation.
+| File | Purpose |
+|---|---|
+| `Fig1–Fig5.{eps,pdf}` | Figures (EPS for Springer, PDF for local preview). |
+| `reproduce.py` | Single entry point: verification suite + all figures + all numbers. |
+| `numbers.json` | Machine-readable record of every quoted value, with seeds. |
+| `claims.json` | Pass/fail record of the 12 verification checks (all pass). |
+| `requirements.txt` | numpy, scipy, matplotlib. |
 
-  Part C  (Sec 2 / resource, relabeled from the prior drafts):
-      Cost of the COHERENT polynomial (QSP-on-amplitude) route, i.e. the
-      only coherent way to get an element-wise exponential. Shows the
-      degree must scale ~ linearly with beta (Peak Flattening otherwise).
-      Fixes vs prior drafts:
-        - no unused pennylane import (this is honest classical NumPy)
-        - Born-rule readout: amplitude approximates exp((beta/2) x), the
-          weight is |P|^2 / sum|P|^2 -> non-negative by construction,
-          replacing the old |P|^1 abs() heuristic
-        - degree-vs-beta sweep makes the d ~ O(beta) claim directly,
-          instead of a single d=3 vs d=7 snapshot
+## Reproducing everything
+
+```bash
+pip install -r requirements.txt
+python reproduce.py verify        # ~30 s: 12 numerical checks of the lemmas
+python reproduce.py all           # ~4 min: checks + all five figures + numbers
+```
+
+`reproduce.py all` exits nonzero if any check fails. Fixed per-figure seeds;
+reruns are bit-identical on a fixed numpy version. After regenerating, copy
+`figures/Fig*.{eps,pdf}`, `figures/numbers.json` and `figures/claims.json`
+into the package root.
+
+What the verification suite checks, by paper statement:
+
+- **Lemma 1** — SVT bi-orthogonal equivariance on random orthogonal pairs.
+- **Lemma 2** — forward direction (permutations, global sign pair); converse
+  witnesses (single sign flip and rotation both fail); and the Hadamard-square
+  identity (Eq. 10) on which the converse proof rests.
+- **Witness** — the 2×2 exchange-matrix computation, exact values.
+- **Proposition 1** — the lower bound against random polynomials of four
+  degrees, and exact attainment by the interpolating polynomial.
+- **Lemma 3** — hard-family constants for T up to 4096, M up to T/2.
+- **Lemma 5** — both inequalities of the truncation certificate on a dense grid.
+- **Construction (§7.2)** — exact statevector computation of the flag-qubit
+  dilation: P_succ = n_eff/T and post-selected state = |ψ_s⟩ to machine
+  precision; polynomial variant reproduces the Fig. 2 pipeline.
+
+## Notes on the simulation design
+
+Scores follow the manuscript's stated model, s = ⟨q,k⟩/√d_k with Gaussian
+Q, K. The stacked-layer experiment draws independent per-layer W_q, W_k, W_v;
+with Q = K = V = X and row-normalised X the score matrix carries a constant
+maximal diagonal, so every token self-attends maximally and attention looks
+artificially sharp — the unprojected variant is retained in `numbers.json`
+only as a robustness check. Cumulative amplification factors are averaged per
+trial, never taken as a product of per-layer means. Minimal-degree searches
+return a missing value rather than a capped one when the search range is
+exhausted; censoring counts are recorded and are zero at all reported
+parameters.
